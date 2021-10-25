@@ -1,0 +1,394 @@
+11.1.1 Code for sensor to work
+#include <LiquidCrystal.h>
+LiquidCrystal lcd( 9,8, 7, 6, 5, 4); // (rs,en,d4,d5,d6,d7)
+
+int TEMP  = A0; 
+int CONDU_SNS_PIN= A1; 
+void TEMP_READ(void);
+void CONDU_READ(void);
+
+int COND_ADC=0;
+
+void setup() {
+ lcd.begin(16, 2);
+ //lcd.clear();
+ pinMode(TEMP,  INPUT);
+ pinMode(CONDU_SNS_PIN,  INPUT);
+ lcd.setCursor(0, 0);
+ lcd.print("  WATER QUALITY  ");
+  lcd.setCursor(0, 1);
+ lcd.print(" MONITOR SYSTEM  ");
+ delay(100);
+
+ 
+ }
+void loop() {
+ 
+ delay(400);
+  lcd.clear();
+    TEMP_READ();
+    CONDU_READ(); 
+ }
+
+
+ 
+ void TEMP_READ(void)
+{
+   int ADC;
+   int Temp;
+  ADC = analogRead(TEMP);   
+                
+    if(ADC>610){
+           Temp = 25+(( ADC-610)/2); 
+    }else{
+            Temp = 25-((610- ADC)/2);
+    } 
+     lcd.setCursor(0, 0);
+    lcd.print("Temp:  ");
+    lcd.setCursor(5, 0); 
+    lcd.print(Temp);
+    lcd.print("c");
+    
+  }
+    
+void CONDU_READ(void){
+   int smoke;
+    COND_ADC=analogRead(CONDU_SNS_PIN);
+
+    if(COND_ADC>1000){
+       lcd.setCursor(0, 1);
+      lcd.print("INSCERT SNS IN WATER  ");
+   }else if((COND_ADC<850)&&(COND_ADC>550)){
+      lcd.setCursor(0, 1);
+      lcd.print("DRINKABLE WATER   ");
+        }else if(COND_ADC<540){
+       lcd.setCursor(0, 1);
+       lcd.print("BAD QUALITY WATER  ");
+    }
+       lcd.setCursor(9, 0);
+    lcd.print("C:");
+    lcd.setCursor(11,0); 
+    lcd.print(COND_ADC);
+    
+}
+11.1.2 Diseases control.java
+package com.xvitcoder.springmvcangularjs.controller;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.xvitcoder.springmvcangularjs.beans.model;
+import com.xvitcoder.springmvcangularjs.service.serviceinterface;
+import com.xvitcoder.springmvcangularjs.service.sms;
+
+@Controller
+@RequestMapping("/disease")
+public class diseaseController {
+	private static final String DATE_FORMAT = "dd-M-yyyy hh:mm:ss a z";
+	private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
+	public static int smscount=0;
+	public static int smscount2=0;
+
+
+
+
+	@Autowired
+	private serviceinterface trService;
+
+	@RequestMapping("/lists")
+	public @ResponseBody List<model> gettrList() {
+		return trService.getlist();
+	}
+
+
+
+	@RequestMapping(value = "/send", method = RequestMethod.GET)
+	public @ResponseBody void sndss(@RequestParam String field1,@RequestParam String field2,@RequestParam String field3,@RequestParam String field4) {
+
+
+		String s1="PUMP IS OFF";
+		if (field4.equals("1")) {
+			s1="PUMP IS ON";
+
+		}
+
+		model rw =  new model();
+		ZoneId fromTimeZone = ZoneId.of("Asia/Kolkata"); 
+
+		LocalDateTime todays = LocalDateTime.now();          //Current time0
+		ZonedDateTime currentISTime = todays.atZone(fromTimeZone); 
+		String todayy=  currentISTime.toString();
+		String repstr=  todayy.replaceAll("[Asia/Kolkata]", "");
+		String sustr= repstr.substring(0, 19);
+		rw.setF1(field1);
+		rw.setF2(field2);
+		rw.setF3(field3);
+		rw.setF4(s1);
+		rw.setDate(sustr);
+		if (field4.equals("1")) {
+			sms s =  new sms();
+			s.sendSMS("8073183401","\n PUMP IS ON\n");
+
+		} else if (field4.equals("0")) {
+			sms s =  new sms();
+			s.sendSMS("8073183401","\n PUMP IS OFF\n");	
+		}
+		trService.add(rw);
+}
+	@RequestMapping("/layout")
+	public String getCarPartialPage() {
+		return "disease/layout";
+		
+	}
+}
+11.1.3 Model. Java
+package com.xvitcoder.springmvcangularjs.beans;
+
+public class model {
+	
+	private String f1;
+	private String f2;
+	private String f3;
+	private String f4;
+	public String getF3() {
+		return f3;
+	}
+	public void setF3(String f3) {
+		this.f3 = f3;
+	}
+	public String getF4() {
+		return f4;
+	}
+	public void setF4(String f4) {
+		this.f4 = f4;
+	}
+
+	
+	
+	private String date;
+	public String getF1() {
+		return f1;
+	}
+	public void setF1(String f1) {
+		this.f1 = f1;
+	}
+	public String getF2() {
+		return f2;
+	}
+	public void setF2(String f2) {
+		this.f2 = f2;
+	}
+	
+	
+	public String getDate() {
+		return date;
+	}
+	public void setDate(String date) {
+		this.date = date;
+	}
+
+}
+11.1.4 SMS.java
+package com.xvitcoder.springmvcangularjs.service;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Date;
+
+public class sms {
+
+	public  static void sendSMS(String mobileNumber,String text) {
+		try{
+            Date mydate = new Date(System.currentTimeMillis());
+            String data = "";
+            data += "sendMethod=simpleMsg";
+            data += "&userId=mitron";
+            data += "&password=" + URLEncoder.encode("Mitron@123456", "UTF-8");
+            data += "&msg=" + URLEncoder.encode(text + mydate.toString(), "UTF-8");
+            data += "&mobile=" + URLEncoder.encode(mobileNumber, "UTF-8");
+            data += "&msgType=text";
+            data += "&format=json";
+            data += "&senderId=CAKEML";
+            URL url = new URL("https://www.smsgateway.center/SMSApi/rest/send?" + data);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            conn.setUseCaches(false); conn.connect();
+            BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            String line;
+            StringBuffer buffer = new StringBuffer();
+            while((line = rd.readLine()) != null){
+                buffer.append(line).append("\n");
+            }
+            System.out.println(buffer.toString());
+            rd.close();
+            conn.disconnect();
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+	}
+}
+11.1.5 Service interface.java
+package com.xvitcoder.springmvcangularjs.service;
+
+import java.util.List;
+
+import com.xvitcoder.springmvcangularjs.beans.model;
+
+public interface serviceinterface {
+
+	void add(model tr);
+
+	List<model> getlist();
+
+}
+11.1.6 Service impl.java
+package com.xvitcoder.springmvcangularjs.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import com.xvitcoder.springmvcangularjs.beans.model;
+@Service("rainWaterservice")
+
+public class serviceimpl implements  serviceinterface {
+	public static ArrayList<model>   arr=  new ArrayList<model>();
+
+	@Override
+	public void add(model tr) {
+        arr.add(tr)	;	
+	}
+
+	@Override
+	public List<model> getlist() {
+		// TODO Auto-generated method stub
+		return arr;
+	}
+
+}
+11.1.7 Layout.java
+<div style="width: 1000px;">
+
+	<marquee style="color: black">Water Monitoring with PH using
+		IoT </marquee>
+
+
+
+	<div class="input-append">
+		<!--  <input style="width:358px; margin-left: 100px;" class="span2" type="text" ng-model="carName" required="required" min="1" />
+    <button class="btn btn-primary" ng-disabled="!carName" ng-click="addNewCar(carName)">Add Car</button> -->
+	</div>
+
+
+	<h3 style="margin-left: 100px; color: black">
+
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Water Monitoring with PH
+		using IoT</h3>
+
+
+	<div class="alert alert-info"
+		style="width: 1000px; margin-left: 100px;" ng-show="trf.length == 0">
+		No Data found</div>
+
+	<div class="table-responsive-lg" id="angular-with-newlines">
+
+
+		<table class="table "
+			style="width: 1000px; background-color: #3394b7; margin-left: 30px;"
+			ng-show="trf.length > 0">
+			<thead>
+				<tr>
+
+					<th style="text-align: center; width: 25px;"><span id="time"
+						style="font-size: 20px; color: #f70909"> Time</span></th>
+
+					<th style="text-align: center;"><span id="time"
+						style="font-size: 20px; color: #f70909">Temperature</span></th>
+
+					<th style="text-align: center;"><span id="time"
+						style="font-size: 20px; color: #f70909">Ph</span></th>
+					<th style="text-align: center;"><span id="time"
+						style="font-size: 20px; color: #f70909">Conductivity </span></th>
+					<th style="text-align: center;"><span id="time"
+						style="font-size: 20px; color: #f70909">PUMP Status </span></th>
+
+
+
+
+
+				</tr>
+			</thead>
+			<tbody>
+
+				<tr ng-repeat="tr in trf|limitTo:-1|orderBy:'-date' ">
+					<td><span style="font-size: 17px"><center>{{tr.date}}</center></span></td>
+					<td><span style="font-size: 17px; text-align: left"><center>{{tr.f1}}&#8451;</center></span>
+					</td>
+					<td><span style="font-size: 17px"><center>{{tr.f2}}</center></span>
+					</td>
+                    <td><span style="font-size: 17px"><center>{{tr.f3}}</center></span>
+					</td>
+                    <td><span style="font-size: 17px"><center>{{tr.f4}}</center></span>
+					</td>
+                    
+
+
+
+					<!--  <td  style="width:70px;text-align:center;"><button class="btn btn-mini btn-danger" ng-click="removeCar(car)">Remove</button></td>-->
+
+				</tr>
+			</tbody>
+		</table>
+	</div>
+	<div></div>
+
+	<!--  <button style="margin-left:100px;"  class="btn btn-danger"  ng-show="cars.length > 1" ng-click="playAudio()">Clear</button>-->
+
+</div>
+
+<style>
+marquee {
+	color: black;
+	font-size: 16px;
+}
+
+th {
+	color: #c44f15;
+}
+
+td {
+	color: white;
+}
+
+#angular-with-newlines {
+	white-space: pre-wrap;
+}
+
+#id {
+	size: 19px;
+}
+
+#values {
+	size: 13px;
+}
+</style>
